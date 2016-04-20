@@ -1,0 +1,9 @@
+
+#Ignore desktop application metadata
+.idea
+.DS_Store
+
+#Ignore vendor files and lock files.
+vendor/*
+composer.lock
+

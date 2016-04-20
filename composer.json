@@ -1,0 +1,13 @@
+{
+    "name": "reesecreative/backuptogoogledrive",
+    "description": "Create and upload database archives to google drive",
+    "authors": [
+        {
+            "name": "Brian Reese",
+            "email": "reesecreativestudio@gmail.com"
+        }
+    ],
+    "require": {
+        "google/apiclient": "^2.0.0@RC"
+    }
+}
