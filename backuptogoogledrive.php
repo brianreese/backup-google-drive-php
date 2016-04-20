@@ -66,7 +66,7 @@ function archive($site, $webroot = '') {
 
   if ($site['dbuser'] && $site['dbpass'] && $site['dbname']) {
     $db_archive = $fileroot . '/' . $timestamp . '_' . $site['dbname'] . ".sql.gz";
-    shell_exec("mysqldump -u" . $site['dbuser'] . " -p" . $site['dbpass'] . " " . $site['dbname'] . " | gzip -9 > " . $db_archive);
+    shell_exec("mysqldump -u" . $site['dbuser'] . " -p" . $site['dbpass'] . " " . $site['dbname'] . " --single-transaction --quick | gzip -9 > " . $db_archive);
     send_archive_to_drive($db_archive, $site['name'] . '/database backups');
   }
 }
