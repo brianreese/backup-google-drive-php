@@ -84,22 +84,54 @@ function archive($site, $webroot = '') {
  */
 function send_archive_to_drive($file_path, $directory, $cleanup = TRUE) {
   $client = get_client();
-  $service = new Google_Service_Drive($client);
-  $result = upload_archive($service, $file_path, $directory);
+  $result = upload_archive($client, $file_path, $directory);
 
   if ($result && $cleanup) {
     unlink($file_path);
   }
 }
 
-function upload_archive($service, $file_path, $directory) {
+function upload_archive($client, $file_path, $directory) {
+  $service = new Google_Service_Drive($client);
   $file = new Google_Service_Drive_DriveFile();
-  $file->setName(basename($file_path));
-  $file->setDescription("Backup file.");
-  $file->setMimeType("application/gzip");
-  $file->setParents(array(prepare_drive_path($service, $directory)));
-  $data = file_get_contents($file_path);
-  return $service->files->create($file, array('data' => $data, 'mimeType' => "application/gzip"));
+  $file->name = basename($file_path);
+  $file->setParents(array(prepare_drive_path($directory)));
+
+  $client->setDefer(TRUE);
+  $request = $service->files->create($file);
+  $chunk_size = 1 * 1024 * 1024;
+  $media = new Google_Http_MediaFileUpload(
+    $client,
+    $request,
+    mime_content_type($file_path),
+    NULL,
+    TRUE,
+    $chunk_size
+  );
+  $media->setFileSize(filesize($file_path));
+
+  // Upload the various chunks. $status will be false until the process is
+  // complete.
+  $status = FALSE;
+  $handle = fopen($file_path, "rb");
+  while (!$status && !feof($handle)) {
+    $chunk = fread($handle, $chunk_size);
+    $status = $media->nextChunk($chunk);
+  }
+
+  // The final value of $status will be the data from the API for the object
+  // that has been uploaded.
+  $result = FALSE;
+  if ($status != FALSE) {
+    $result = $status;
+  }
+
+
+  fclose($handle);
+  // Reset to the client to execute requests immediately in the future.
+  $client->setDefer(FALSE);
+
+  return $result;
 }
 
 /**
@@ -186,12 +218,12 @@ function get_client() {
  * @return string
  *   The id of the last folder component in the path.
  */
-function prepare_drive_path($service, $path) {
+function prepare_drive_path($path) {
   $folders = explode('/', $path);
   $id = NULL;
   for ($i = 0; $i < count($folders); $i++) {
     $parent = $i > 0 ? $folders[$i - 1] : NULL;
-    $id = prepare_folder($service, $folders[$i], $parent);
+    $id = prepare_folder($folders[$i], $parent);
   }
 
   return $id;
@@ -213,8 +245,10 @@ function prepare_drive_path($service, $path) {
  * @return string
  *   The file id of the google drive folder.
  */
-function prepare_folder(Google_Service_Drive $service, $folder, $parent = NULL) {
-  $parent_id = $parent ? prepare_folder($service, $parent) : FALSE;
+function prepare_folder($folder, $parent = NULL) {
+  $client = get_client();
+  $service = new Google_Service_Drive($client);
+  $parent_id = $parent ? prepare_folder($parent) : FALSE;
   $params = array(
     'q' => "
       mimeType = 'application/vnd.google-apps.folder' and
